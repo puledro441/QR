@@ -10,10 +10,8 @@
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; overflow: hidden; height: 100dvh; background: #000; }
-
     .screen { display: none; height: 100dvh; width: 100%; flex-direction: column; }
     .screen.active { display: flex; }
-
     /* ── Scanner ── */
     #scanner-screen { position: relative; background: #000; align-items: center; justify-content: center; }
     #reader { width: 100%; height: 100%; }
@@ -38,7 +36,14 @@
       background: rgba(0,0,0,0.5);
       padding: 8px 20px; border-radius: 20px;
     }
-
+    .scanner-error {
+      position: absolute; bottom: 40px; left: 20px; right: 20px;
+      color: white; font-size: 14px; text-align: center;
+      background: rgba(200,40,40,0.85);
+      padding: 12px 16px; border-radius: 12px;
+      display: none;
+    }
+    .scanner-error.show { display: block; }
     /* ── Input ── */
     #input-screen {
       background: #fff;
@@ -66,7 +71,6 @@
     }
     #ok-btn:disabled { background: #ccc; }
     #ok-btn:active { opacity: 0.85; }
-
     /* ── Confirmation ── */
     #confirm-screen { background: #3ba653; }
     .confirm-top {
@@ -102,7 +106,6 @@
   </style>
 </head>
 <body>
-
   <!-- Screen 1: Scanner -->
   <div id="scanner-screen" class="screen active">
     <div id="reader"></div>
@@ -110,8 +113,8 @@
       <div class="scanner-box"></div>
       <div class="scanner-label">Scansiona un QR Code</div>
     </div>
+    <div class="scanner-error" id="scanner-error">Fotocamera non disponibile. Riprova.</div>
   </div>
-
   <!-- Screen 2: Input -->
   <div id="input-screen" class="screen">
     <div class="qr-icon">&#x2713;</div>
@@ -120,7 +123,6 @@
     <input id="amount-input" type="number" inputmode="decimal" placeholder="Es. 10.50" min="0" step="0.01">
     <button id="ok-btn" disabled onclick="handleOK()">OK</button>
   </div>
-
   <!-- Screen 3: Confirmation -->
   <div id="confirm-screen" class="screen">
     <div class="confirm-top">
@@ -139,30 +141,58 @@
     </div>
     <button class="confirm-close" onclick="resetApp()">Chiudi</button>
   </div>
-
   <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
-    let scanner = null;
+    // Create ONE scanner instance for the whole page lifetime and reuse it
+    // for every start/stop cycle. Creating a new Html5Qrcode() on top of the
+    // same #reader div on every scan is what broke repeat scans on iOS
+    // Safari: the previous instance's camera track hadn't been released yet,
+    // so the next getUserMedia() call silently failed.
+    const scanner = new Html5Qrcode("reader");
 
     function showScreen(id) {
       document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
       document.getElementById(id).classList.add('active');
     }
 
+    function showScannerError(msg) {
+      const el = document.getElementById('scanner-error');
+      el.textContent = msg;
+      el.classList.add('show');
+    }
+    function hideScannerError() {
+      document.getElementById('scanner-error').classList.remove('show');
+    }
+
     function startScanner() {
-      scanner = new Html5Qrcode("reader");
+      // Guard against double-starts (e.g. rapid resetApp calls).
+      const state = scanner.getState ? scanner.getState() : null;
+      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
+        return;
+      }
+      hideScannerError();
       scanner.start(
         { facingMode: "environment" },
         { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: window.innerHeight / window.innerWidth },
         (decodedText) => {
-          scanner.stop().then(() => {
-            scanner = null;
-            showScreen('input-screen');
-            document.getElementById('amount-input').focus();
-          });
+          scanner.stop()
+            .then(() => {
+              showScreen('input-screen');
+              document.getElementById('amount-input').focus();
+            })
+            .catch((err) => {
+              // Even if stop() rejects, still move the user forward —
+              // the scan itself succeeded.
+              console.warn('stop() failed', err);
+              showScreen('input-screen');
+              document.getElementById('amount-input').focus();
+            });
         },
-        () => {}
-      ).catch(err => console.warn(err));
+        () => { /* per-frame "no QR found" callback — ignore */ }
+      ).catch(err => {
+        console.warn('start() failed', err);
+        showScannerError('Fotocamera non disponibile. Tocca per riprovare.');
+      });
     }
 
     const input = document.getElementById('amount-input');
@@ -170,13 +200,11 @@
     input.addEventListener('input', () => {
       btn.disabled = input.value.trim() === '';
     });
-
     function formatCHF(val) {
       const n = parseFloat(val.replace(',', '.'));
       if (isNaN(n)) return 'CHF ' + val;
       return 'CHF ' + n.toFixed(2);
     }
-
     function formatDateTime(date) {
       const months = ['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
       const d = date.getDate();
@@ -186,7 +214,6 @@
       const mm = String(date.getMinutes()).padStart(2,'0');
       return `${d} ${m} ${y} | <span>${hh}:${mm}</span>`;
     }
-
     function handleOK() {
       const val = input.value.trim();
       if (!val) return;
@@ -195,13 +222,18 @@
       document.getElementById('display-datetime').innerHTML = formatDateTime(now);
       showScreen('confirm-screen');
     }
-
     function resetApp() {
       input.value = '';
       btn.disabled = true;
       showScreen('scanner-screen');
-      startScanner();
+      // Small delay gives iOS Safari time to fully release the previous
+      // camera track before we request it again — starting immediately
+      // is what caused the second/third scan to hang on iPhone.
+      setTimeout(startScanner, 350);
     }
+
+    // Retry on tap if the camera failed to start.
+    document.getElementById('scanner-error').addEventListener('click', startScanner);
 
     startScanner();
   </script>
