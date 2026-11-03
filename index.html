@@ -1,150 +1,576 @@
+
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="QR Reader">
-  <title>Lettore QR</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; height: 100dvh; background: #000; overflow: hidden; }
-    .screen { display: none; height: 100dvh; width: 100%; flex-direction: column; }
-    .screen.active { display: flex; }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="QR Pay">
+<title>QR Payment</title>
 
-    /* Scanner */
-    #scanner-screen { position: relative; align-items: center; justify-content: center; }
-    #reader { position: absolute; inset: 0; }
-    #reader video { object-fit: cover; width: 100% !important; height: 100% !important; }
-    #reader img { display: none !important; }
-    #reader * { border: none !important; }
-    .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; }
-    .box { width: 220px; height: 220px; border: 3px solid rgba(255,255,255,.85); border-radius: 20px; box-shadow: 0 0 0 9999px rgba(0,0,0,.45); }
-    .label { margin-top: 24px; color: #fff; font-size: 16px; background: rgba(0,0,0,.5); padding: 8px 20px; border-radius: 20px; }
-    .error { position: absolute; bottom: 40px; left: 20px; right: 20px; color: #fff; font-size: 14px; text-align: center; background: rgba(200,40,40,.9); padding: 12px 16px; border-radius: 12px; display: none; }
-    .error.show { display: block; }
+<style>
+* { box-sizing:border-box; margin:0; padding:0; }
 
-    /* Result */
-    #result-screen { background: #f2f3f5; padding: 48px 16px 32px; gap: 14px; overflow-y: auto; }
-    .tag { align-self: center; font-size: 13px; font-weight: 600; color: #fff; background: #4a5568; padding: 6px 14px; border-radius: 999px; }
-    h1 { font-size: 22px; color: #111; text-align: center; }
-    .card { background: #fff; border-radius: 14px; overflow: hidden; }
-    .row { padding: 14px 18px; }
-    .row + .row { border-top: 1px solid #eee; }
-    .k { font-size: 12px; color: #888; margin-bottom: 4px; }
-    .v { font-size: 16px; color: #111; word-break: break-all; }
-    pre.v { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre-wrap; }
-    .note { font-size: 13px; color: #666; text-align: center; }
-    button { width: 100%; padding: 16px; font-size: 17px; font-weight: 600; border: none; border-radius: 14px; background: #2b6cb0; color: #fff; -webkit-tap-highlight-color: transparent; }
-    button:active { opacity: .85; }
-  </style>
+body {
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  height:100dvh;
+  overflow:hidden;
+  background:#000;
+}
+
+.screen {
+  display:none;
+  height:100dvh;
+  width:100%;
+  flex-direction:column;
+}
+
+.screen.active { display:flex; }
+
+/* SCANNER */
+
+#scanner-screen {
+  position:relative;
+  background:#000;
+  align-items:center;
+  justify-content:center;
+}
+
+#reader {
+  position:absolute;
+  inset:0;
+}
+
+#reader video {
+  object-fit:cover;
+  width:100%!important;
+  height:100%!important;
+}
+
+#reader img { display:none!important; }
+#reader * { border:none!important; }
+
+.scanner-overlay {
+  position:absolute;
+  inset:0;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  pointer-events:none;
+}
+
+.scanner-box {
+  width:220px;
+  height:220px;
+  border:3px solid rgba(255,255,255,.85);
+  border-radius:20px;
+  box-shadow:0 0 0 9999px rgba(0,0,0,.45);
+}
+
+.scanner-label {
+  margin-top:24px;
+  color:white;
+  font-size:16px;
+  background:rgba(0,0,0,.5);
+  padding:8px 20px;
+  border-radius:20px;
+}
+
+.scanner-error {
+  position:absolute;
+  bottom:40px;
+  left:20px;
+  right:20px;
+  color:white;
+  font-size:14px;
+  text-align:center;
+  background:rgba(200,40,40,.9);
+  padding:12px 16px;
+  border-radius:12px;
+  display:none;
+}
+
+.scanner-error.show { display:block; }
+
+/* AMOUNT PAGE */
+
+#input-screen {
+  background:#fff;
+  align-items:center;
+  justify-content:center;
+  padding:40px 32px;
+  gap:18px;
+}
+
+.qr-icon {
+  font-size:56px;
+  color:#3ba653;
+}
+
+#input-screen h1 {
+  font-size:24px;
+  font-weight:600;
+  color:#111;
+}
+
+#input-screen p {
+  font-size:15px;
+  color:#888;
+}
+
+.qr-details {
+  width:100%;
+  background:#f5f5f5;
+  padding:12px;
+  border-radius:12px;
+  font-size:13px;
+  color:#555;
+  word-break:break-word;
+  max-height:100px;
+  overflow:auto;
+}
+
+#amount-input {
+  width:100%;
+  padding:14px 18px;
+  font-size:22px;
+  font-weight:500;
+  text-align:center;
+  border:1.5px solid #ddd;
+  border-radius:12px;
+  outline:none;
+  color:#111;
+  -webkit-appearance:none;
+}
+
+#amount-input:focus {
+  border-color:#3ba653;
+}
+
+#ok-btn {
+  width:100%;
+  padding:16px;
+  background:#3ba653;
+  color:white;
+  font-size:18px;
+  font-weight:600;
+  border:none;
+  border-radius:14px;
+  cursor:pointer;
+}
+
+#ok-btn:disabled {
+  background:#ccc;
+}
+
+/* CONFIRMATION PAGE */
+
+#confirm-screen {
+  background:#3ba653;
+}
+
+.confirm-top {
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:14px;
+  padding:40px 32px 24px;
+}
+
+.confirm-check {
+  font-size:72px;
+  color:white;
+  line-height:1;
+}
+
+.confirm-title {
+  font-size:20px;
+  font-weight:500;
+  color:white;
+  text-align:center;
+  line-height:1.4;
+}
+
+.confirm-card {
+  margin:0 14px;
+  background:white;
+  border-radius:16px;
+  overflow:hidden;
+}
+
+.card-row {
+  padding:16px 22px;
+}
+
+.card-row + .card-row {
+  border-top:.5px solid #e8e8e8;
+}
+
+.card-label {
+  font-size:12px;
+  color:#999;
+  margin-bottom:6px;
+}
+
+.card-value {
+  font-size:30px;
+  font-weight:400;
+  color:#111;
+  text-align:center;
+}
+
+.card-value-sm {
+  font-size:16px;
+  color:#111;
+  text-align:center;
+}
+
+.confirm-close {
+  margin:12px 14px 40px;
+  background:white;
+  border:none;
+  border-radius:14px;
+  width:calc(100% - 28px);
+  padding:16px;
+  font-size:17px;
+  font-weight:500;
+  color:#111;
+  cursor:pointer;
+}
+</style>
 </head>
+
 <body>
-  <div id="scanner-screen" class="screen active">
-    <div id="reader"></div>
-    <div class="overlay">
-      <div class="box"></div>
-      <div class="label">Inquadra un QR Code</div>
+
+<!-- SCREEN 1: QR SCANNER -->
+
+<div id="scanner-screen" class="screen active">
+
+  <div id="reader"></div>
+
+  <div class="scanner-overlay">
+    <div class="scanner-box"></div>
+    <div class="scanner-label">Scansiona un QR Code</div>
+  </div>
+
+  <div class="scanner-error" id="scanner-error">
+    Fotocamera non disponibile. Tocca per riprovare.
+  </div>
+
+</div>
+
+
+<!-- SCREEN 2: AMOUNT INPUT -->
+
+<div id="input-screen" class="screen">
+
+  <div class="qr-icon">✓</div>
+
+  <h1>QR Code scansionato!</h1>
+
+  <p>Inserisci l'importo</p>
+
+  <div class="qr-details" id="qr-details">
+    QR Code letto correttamente.
+  </div>
+
+  <input
+    id="amount-input"
+    type="number"
+    inputmode="decimal"
+    placeholder="Es. 10.50"
+    min="0"
+    step="0.01"
+  >
+
+  <button id="ok-btn" disabled onclick="handleOK()">
+    OK
+  </button>
+
+</div>
+
+
+<!-- SCREEN 3: CONFIRMATION -->
+
+<div id="confirm-screen" class="screen">
+
+  <div class="confirm-top">
+
+    <div class="confirm-check">✓</div>
+
+    <div class="confirm-title">
+      Pagamento effettuato<br>
+      con successo
     </div>
-    <div class="error" id="scanner-error">Fotocamera non disponibile. Tocca per riprovare.</div>
+
   </div>
 
-  <div id="result-screen" class="screen">
-    <div class="tag" id="type-tag">QR</div>
-    <h1>Contenuto del QR Code</h1>
-    <div class="card" id="fields"></div>
-    <p class="note">Solo lettura — nessun pagamento viene eseguito.</p>
-    <button onclick="scanAgain()">Scansiona di nuovo</button>
+  <div class="confirm-card">
+
+    <div class="card-row">
+      <div class="card-label">Importo</div>
+      <div class="card-value" id="display-amount">
+        CHF 0.00
+      </div>
+    </div>
+
+    <div class="card-row">
+      <div class="card-label">Data / Ora</div>
+      <div class="card-value-sm" id="display-datetime"></div>
+    </div>
+
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script>
-    const scanner = new Html5Qrcode("reader");
-    let busy = false;      // true while start/stop is in progress or a result is shown
-    let aspect = null;     // computed once, before any keyboard/layout changes
+  <button class="confirm-close" onclick="resetApp()">
+    Chiudi
+  </button>
 
-    function showScreen(id) {
-      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-      document.getElementById(id).classList.add('active');
-    }
-    const errEl = document.getElementById('scanner-error');
-    errEl.addEventListener('click', () => { busy = false; startScanner(); });
+</div>
 
-    function isRunning() {
-      try { return scanner.getState() === 2 || scanner.getState() === 3; } // 2 = SCANNING, 3 = PAUSED
-      catch (e) { return false; }
-    }
 
-    async function startScanner() {
-      if (isRunning()) return;
-      errEl.classList.remove('show');
-      if (!aspect) aspect = window.innerHeight / window.innerWidth;
-      try {
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: aspect },
-          onScan,
-          () => {}
-        );
-        busy = false;
-      } catch (e) {
-        console.warn('start failed', e);
-        errEl.classList.add('show');
-      }
-    }
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
-    async function onScan(text) {
-      // The success callback can fire several times in a row before the
-      // camera stops; ignore everything after the first hit.
-      if (busy) return;
-      busy = true;
-      try { await scanner.stop(); } catch (e) { console.warn('stop failed', e); }
-      try { scanner.clear(); } catch (e) {}
-      showResult(text);
-    }
+<script>
 
-    function esc(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-    function row(k, v, mono) {
-      return `<div class="row"><div class="k">${esc(k)}</div><${mono ? 'pre' : 'div'} class="v">${esc(v)}</${mono ? 'pre' : 'div'}></div>`;
-    }
+// ONE SCANNER INSTANCE
 
-    function showResult(text) {
-      const tag = document.getElementById('type-tag');
-      let html = '';
-      const lines = text.split(/\r?\n/);
+const scanner = new Html5Qrcode("reader");
 
-      if (lines[0] === 'SPC') {
-        // Swiss QR-bill (used by banks and TWINT for invoices)
-        tag.textContent = 'QR-fattura svizzera';
-        const amt = lines[18] ? `${lines[19] || ''} ${lines[18]}` : 'non specificato';
-        html += row('Beneficiario', lines[5] || '—');
-        html += row('IBAN', lines[3] || '—');
-        html += row('Località', [lines[8], lines[9], lines[10]].filter(Boolean).join(' ') || '—');
-        html += row('Importo', amt);
-        if (lines[28]) html += row('Riferimento', lines[28]);
-        if (lines[29]) html += row('Messaggio', lines[29]);
-      } else if (/twint/i.test(text)) {
-        tag.textContent = 'TWINT';
-        html += row('Tipo', 'Codice TWINT (link/token)');
-        try { const u = new URL(text); html += row('Dominio', u.host); } catch (e) {}
-      } else if (/^https?:\/\//i.test(text)) {
-        tag.textContent = 'Link';
-      } else {
-        tag.textContent = 'Testo';
-      }
-      html += row('Contenuto grezzo', text, true);
-      document.getElementById('fields').innerHTML = html;
-      showScreen('result-screen');
-    }
+let busy = false;
+let aspect = null;
+let qrContent = "";
 
-    function scanAgain() {
-      showScreen('scanner-screen');
-      // Give iOS Safari time to release the previous camera track.
-      setTimeout(() => { busy = false; startScanner(); }, 400);
-    }
+// SCREEN NAVIGATION
 
+function showScreen(id) {
+  document.querySelectorAll(".screen").forEach(screen => {
+    screen.classList.remove("active");
+  });
+
+  document.getElementById(id).classList.add("active");
+}
+
+// SCANNER ERROR
+
+const errEl = document.getElementById("scanner-error");
+
+errEl.addEventListener("click", () => {
+  busy = false;
+  startScanner();
+});
+
+// CHECK SCANNER STATUS
+
+function isRunning() {
+  try {
+    return scanner.getState() === 2 ||
+           scanner.getState() === 3;
+  } catch(e) {
+    return false;
+  }
+}
+
+// START QR SCANNER
+
+async function startScanner() {
+
+  if (isRunning()) return;
+
+  errEl.classList.remove("show");
+
+  if (!aspect) {
+    aspect = window.innerHeight / window.innerWidth;
+  }
+
+  try {
+
+    await scanner.start(
+      { facingMode:"environment" },
+
+      {
+        fps:10,
+        qrbox:{ width:220, height:220 },
+        aspectRatio:aspect
+      },
+
+      onScan,
+
+      () => {}
+
+    );
+
+    busy = false;
+
+  } catch(e) {
+
+    console.warn("Scanner start failed", e);
+    errEl.classList.add("show");
+
+  }
+}
+
+
+// QR CODE READING LOGIC
+
+async function onScan(text) {
+
+  // Prevent multiple readings
+
+  if (busy) return;
+
+  busy = true;
+
+  qrContent = text;
+
+  try {
+    await scanner.stop();
+  } catch(e) {
+    console.warn("Scanner stop failed", e);
+  }
+
+  // Read and identify QR content
+
+  const lines = text.split(/\r?\n/);
+
+  let qrType = "Testo";
+
+  if (lines[0] === "SPC") {
+
+    qrType = "QR-fattura svizzera";
+
+  } else if (/twint/i.test(text)) {
+
+    qrType = "TWINT";
+
+  } else if (/^https?:\/\//i.test(text)) {
+
+    qrType = "Link";
+
+  }
+
+  // Display detected QR information on amount page
+
+  document.getElementById("qr-details").textContent =
+    "Tipo: " + qrType + "\nContenuto: " + text;
+
+  // Move to amount page
+
+  showScreen("input-screen");
+
+  document.getElementById("amount-input").focus();
+
+}
+
+
+// AMOUNT INPUT
+
+const input = document.getElementById("amount-input");
+const btn = document.getElementById("ok-btn");
+
+input.addEventListener("input", () => {
+
+  const value = parseFloat(input.value);
+
+  btn.disabled =
+    input.value.trim() === "" ||
+    !Number.isFinite(value) ||
+    value <= 0;
+
+});
+
+
+// FORMAT CHF
+
+function formatCHF(val) {
+
+  const n = parseFloat(val.replace(",", "."));
+
+  if (isNaN(n)) return "CHF " + val;
+
+  return "CHF " + n.toFixed(2);
+
+}
+
+
+// FORMAT DATE AND TIME
+
+function formatDateTime(date) {
+
+  const months = [
+    "gen","feb","mar","apr","mag","giu",
+    "lug","ago","set","ott","nov","dic"
+  ];
+
+  const d = date.getDate();
+  const m = months[date.getMonth()];
+  const y = date.getFullYear();
+
+  const hh = String(date.getHours()).padStart(2,"0");
+  const mm = String(date.getMinutes()).padStart(2,"0");
+
+  return `${d} ${m} ${y} | ${hh}:${mm}`;
+
+}
+
+
+// CONFIRM PAYMENT
+
+function handleOK() {
+
+  const val = input.value.trim();
+
+  if (!val || !Number.isFinite(Number(val)) || Number(val) <= 0) {
+    return;
+  }
+
+  const now = new Date();
+
+  document.getElementById("display-amount").textContent =
+    formatCHF(val);
+
+  document.getElementById("display-datetime").textContent =
+    formatDateTime(now);
+
+  showScreen("confirm-screen");
+
+}
+
+
+// RESET APPLICATION
+
+function resetApp() {
+
+  input.value = "";
+  btn.disabled = true;
+
+  qrContent = "";
+
+  document.getElementById("qr-details").textContent =
+    "QR Code letto correttamente.";
+
+  showScreen("scanner-screen");
+
+  // Allow camera to release before restarting
+
+  setTimeout(() => {
+
+    busy = false;
     startScanner();
-  </script>
+
+  }, 400);
+
+}
+
+
+// START APPLICATION
+
+startScanner();
+
+</script>
+
 </body>
 </html>
